@@ -3,12 +3,16 @@ const { ethers } = require("hardhat");
 const { exportCallDataGroth16 } = require("./utils/utils");
 
 describe("NoxFi", function () {
-  let depositVerifier, noxFi, weth, dai;
+  let depositVerifier, withdrawVerifier, noxFi, weth, dai;
 
   before(async function () {
-    depositVerifier = await ethers.deployContract("Groth16Verifier", []);
+    depositVerifier = await ethers.deployContract("DepositVerifier", []);
     await depositVerifier.waitForDeployment();
-    const verifierAddr = await depositVerifier.getAddress();
+    const depositVerifierAddr = await depositVerifier.getAddress();
+
+    withdrawVerifier = await ethers.deployContract("WithdrawVerifier", []);
+    await withdrawVerifier.waitForDeployment();
+    const withdrawVerifierAddr = await withdrawVerifier.getAddress();
 
     weth = await ethers.deployContract("Token", ["WETH", "WETH"]);
     await weth.waitForDeployment();
@@ -17,13 +21,15 @@ describe("NoxFi", function () {
     await dai.waitForDeployment();
     const daiAddr = await dai.getAddress();
 
-    noxFi = await ethers.deployContract("NoxFi", [wethAddr, daiAddr, verifierAddr]);
+    noxFi = await ethers.deployContract("NoxFi", [wethAddr, daiAddr, depositVerifierAddr, withdrawVerifierAddr]);
     await noxFi.waitForDeployment();
     const noxFiAddr = await noxFi.getAddress();
 
     await weth.approve(noxFiAddr, BigInt(1e24));
     await dai.approve(noxFiAddr, BigInt(1e24));
   });
+
+  /* Note: these test iterations run sequentially and the state is remained */
 
   it("Should return true for valid proof on-chain", async function () {
     const salt = 1234567;
@@ -51,7 +57,7 @@ describe("NoxFi", function () {
     expect(result).to.equal(true);
   });
 
-  it("Should return true for valid proof on-chain", async function () {
+  it("Deposit Scenario", async function () {
     const salt = 1234567;
     const amount = 10;
     const asset = 0;
@@ -76,6 +82,36 @@ describe("NoxFi", function () {
     );
     const balance = await weth.balanceOf(await noxFi.getAddress());
     expect(balance).to.not.equal(0);
+  });
+
+  it("Withdraw Scenario", async function () {
+    const salt = 1234567;
+    const amount = 10;
+    const asset = 0;
+
+    const input = {
+      salt: salt,
+      amount: amount,
+      asset: asset,
+    };
+
+    let dataResult = await exportCallDataGroth16(
+      input,
+      "./zkproof/withdraw.wasm",
+      "./zkproof/withdraw_final.zkey"
+    );
+
+    let balance = await weth.balanceOf(await noxFi.getAddress());
+    expect(balance).to.not.equal(0);
+
+    await noxFi.withdraw(
+      dataResult.a,
+      dataResult.b,
+      dataResult.c,
+      dataResult.Input
+    );
+    balance = await weth.balanceOf(await noxFi.getAddress());
+    expect(balance).to.equal(0);
   });
 });
 
