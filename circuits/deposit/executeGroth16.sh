@@ -4,7 +4,7 @@
 CIRCUIT=deposit
 
 # Variable to store the number of the ptau file
-PTAU=18
+PTAU=12
 
 # In case there is a circuit name as an input
 if [ "$1" ]; then
