@@ -4,30 +4,61 @@
 // You can also run a script with `npx hardhat run <script>`. If you do that, Hardhat
 // will compile your contracts, add the Hardhat Runtime Environment's members to the
 // global scope, and execute the script.
+const { ethers } = require("hardhat");
 const hre = require("hardhat");
 
 async function main() {
-  const currentTimestampInSeconds = Math.round(Date.now() / 1000);
-  const unlockTime = currentTimestampInSeconds + 60;
+  const [deployer] = await ethers.getSigners();
 
-  const lockedAmount = hre.ethers.parseEther("0.001");
+  console.log("Deploying contracts with the account:", deployer.address);
+  console.log(await ethers.provider.getBlockNumber());
+  console.log("Account balance:", (await ethers.provider.getBalance(deployer.address)).toString());
 
-  const lock = await hre.ethers.deployContract("Lock", [unlockTime], {
-    value: lockedAmount,
-  });
 
-  await lock.waitForDeployment();
+  let depositVerifier, withdrawVerifier, orderVerifier, settleVerifier, cancelVerifier;
+  let noxFi, weth, dai;
+  let signer, signer1, signer2, signer11, signer21;
 
-  console.log(
-    `Lock with ${ethers.formatEther(
-      lockedAmount
-    )}ETH and unlock timestamp ${unlockTime} deployed to ${lock.target}`
-  );
+  depositVerifier = await ethers.deployContract("DepositVerifier", []);
+  await depositVerifier.waitForDeployment();
+  const depositVerifierAddr = await depositVerifier.getAddress();
+
+  withdrawVerifier = await ethers.deployContract("WithdrawVerifier", []);
+  await withdrawVerifier.waitForDeployment();
+  const withdrawVerifierAddr = await withdrawVerifier.getAddress();
+
+  orderVerifier = await ethers.deployContract("OrderVerifier", []);
+  await orderVerifier.waitForDeployment();
+  const orderVerifierAddr = await orderVerifier.getAddress();
+
+  settleVerifier = await ethers.deployContract("SettleVerifier", []);
+  await settleVerifier.waitForDeployment();
+  const settleVerifierAddr = await settleVerifier.getAddress();
+
+  cancelVerifier = await ethers.deployContract("CancelVerifier", []);
+  await cancelVerifier.waitForDeployment();
+  const cancelVerifierAddr = await cancelVerifier.getAddress();
+
+  weth = await ethers.deployContract("Token", ["WETH", "WETH"]);
+  await weth.waitForDeployment();
+  const wethAddr = await weth.getAddress();
+  console.log(wethAddr, "WETH");
+
+  dai = await ethers.deployContract("Token", ["DAI", "DAI"]);
+  await dai.waitForDeployment();
+  const daiAddr = await dai.getAddress();
+  console.log(daiAddr, "DAI");
+
+  noxFi = await ethers.deployContract("NoxFi", [wethAddr, daiAddr, '0xD5D56F27A592F2E9A008647eeAa390cc353dfc36', depositVerifierAddr, withdrawVerifierAddr, orderVerifierAddr, settleVerifierAddr, cancelVerifierAddr]);
+  await noxFi.waitForDeployment();
+  const noxFiAddr = await noxFi.getAddress();
+  console.log(noxFiAddr, "NoxFi");
 }
 
-// We recommend this pattern to be able to use async/await everywhere
-// and properly handle errors.
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+
