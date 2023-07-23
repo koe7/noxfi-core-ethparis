@@ -3,7 +3,8 @@ const { ethers } = require("hardhat");
 const { exportCallDataGroth16 } = require("./utils/utils");
 
 describe("NoxFi", function () {
-  let depositVerifier, withdrawVerifier, orderVerifier, noxFi, weth, dai;
+  let depositVerifier, withdrawVerifier, orderVerifier, settleVerifier, cancelVerifier;
+  let noxFi, weth, dai;
   let signer, signer1, signer2;
 
   before(async function () {
@@ -21,6 +22,14 @@ describe("NoxFi", function () {
     await orderVerifier.waitForDeployment();
     const orderVerifierAddr = await orderVerifier.getAddress();
 
+    settleVerifier = await ethers.deployContract("SettleVerifier", []);
+    await settleVerifier.waitForDeployment();
+    const settleVerifierAddr = await settleVerifier.getAddress();
+
+    cancelVerifier = await ethers.deployContract("CancelVerifier", []);
+    await cancelVerifier.waitForDeployment();
+    const cancelVerifierAddr = await cancelVerifier.getAddress();
+
     weth = await ethers.deployContract("Token", ["WETH", "WETH"]);
     await weth.waitForDeployment();
     const wethAddr = await weth.getAddress();
@@ -29,7 +38,7 @@ describe("NoxFi", function () {
     await dai.waitForDeployment();
     const daiAddr = await dai.getAddress();
 
-    noxFi = await ethers.deployContract("NoxFi", [wethAddr, daiAddr, signer.address, depositVerifierAddr, withdrawVerifierAddr, orderVerifierAddr]);
+    noxFi = await ethers.deployContract("NoxFi", [wethAddr, daiAddr, signer.address, depositVerifierAddr, withdrawVerifierAddr, orderVerifierAddr, settleVerifierAddr, cancelVerifierAddr]);
     await noxFi.waitForDeployment();
     const noxFiAddr = await noxFi.getAddress();
 

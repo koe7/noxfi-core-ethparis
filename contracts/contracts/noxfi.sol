@@ -24,6 +24,15 @@ interface IOrderVerifier {
     ) external view returns (bool);
 }
 
+interface ISettleVerifier {
+    function verifyProof(
+        uint[2] memory a,
+        uint[2][2] memory b,
+        uint[2] memory c,
+        uint[4] memory input
+    ) external view returns (bool);
+}
+
 contract NoxFi {
     address public WETHAddr;
     address public DAIAddr;
@@ -31,25 +40,29 @@ contract NoxFi {
     address public depositVerifierAddr;
     address public withdrawVerifierAddr;
     address public orderVerifierAddr;
+    address public settleVerifierAddr;
+    address public cancelVerifierAddr;
     uint[] public zArr;
     uint[] public nArr;
     uint[] public oArr;
     uint[] public mArr; // matched
     uint[] public cArr; // canceled
-    uint[] public onArr; // order nullifier
+    uint[] public onArr;
     uint public settlementPrice;
     // root is calculated by xor of all Zs.
     // Used for existence of Z
     // But skip it in this hackathon :P
     // uint root;
 
-    constructor(address _WETHAddr, address _DAIAddr, address _matcherAddr, address _depositVerifierAddr, address _withdrawVerifierAddr, address _orderVerifierAddr) {
+    constructor(address _WETHAddr, address _DAIAddr, address _matcherAddr, address _depositVerifierAddr, address _withdrawVerifierAddr, address _orderVerifierAddr, address _settleVerifierAddr, address _cancelVerifierAddr) {
         WETHAddr = _WETHAddr;
         DAIAddr = _DAIAddr;
         matcherAddr = _matcherAddr;
         depositVerifierAddr = _depositVerifierAddr;
         withdrawVerifierAddr = _withdrawVerifierAddr;
         orderVerifierAddr = _orderVerifierAddr;
+        settleVerifierAddr = _settleVerifierAddr;
+        cancelVerifierAddr = _cancelVerifierAddr;
     }
 
     function verifyDepositProof(
@@ -77,6 +90,24 @@ contract NoxFi {
         uint256[2] memory input
     ) public view returns (bool) {
         return IOrderVerifier(orderVerifierAddr).verifyProof(a, b, c, input);
+    }
+
+    function verifySettleProof(
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[4] memory input
+    ) public view returns (bool) {
+        return ISettleVerifier(settleVerifierAddr).verifyProof(a, b, c, input);
+    }
+
+    function verifyCancelProof(
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[3] memory input
+    ) public view returns (bool) {
+        return IVerifier(cancelVerifierAddr).verifyProof(a, b, c, input);
     }
 
     function deposit(
@@ -132,9 +163,7 @@ contract NoxFi {
         }
       }
       require(exists, "The O doesn't exist");
-      for (uint i = 0; i < mArr.length; ++i) {
-        require(mArr[i] != o, "The O already matched");
-      }
+      for (uint i = 0; i < mArr.length; ++i) { require(mArr[i] != o, "The O already matched"); }
       for (uint i = 0; i < cArr.length; ++i) {
         require(cArr[i] != o, "The O already canceled");
       }
@@ -149,7 +178,50 @@ contract NoxFi {
       require(msg.sender == matcherAddr, "Only Matcher can set settlement price");
       settlementPrice = price;
     }
+
+    function settle(
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[4] memory input
+    ) external {
+      require(verifySettleProof(a, b, c, input), "Filed proof check");
+      require(input[3] == settlementPrice, "Wrong settlement price");
+      bool isMatched;
+      for (uint i = 0; i < mArr.length; ++i) {
+        if (mArr[i] == input[0]) {
+          isMatched = true;
+          break;
+        }
+      }
+      require(isMatched, "The order have never been matched");
+      for (uint i = 0; i < onArr.length; ++i) {
+        require(onArr[i] != input[1], "The ON already exists");
+      }
+      onArr.push(input[1]);
+      zArr.push(input[2]);
+    }
+
+    function cancel(
+        uint256[2] memory a,
+        uint256[2][2] memory b,
+        uint256[2] memory c,
+        uint256[3] memory input
+    ) external {
+      require(verifyCancelProof(a, b, c, input), "Filed proof check");
+      bool isCanceled;
+      for (uint i = 0; i < cArr.length; ++i) {
+        if (cArr[i] == input[0]) {
+          isCanceled = true;
+          break;
+        }
+      }
+      require(isCanceled, "The order have never been canceled");
+      for (uint i = 0; i < onArr.length; ++i) {
+        require(onArr[i] != input[1], "The ON already exists");
+      }
+      onArr.push(input[1]);
+      zArr.push(input[2]);
+    }
 }
-
-
 
