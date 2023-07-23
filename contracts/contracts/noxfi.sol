@@ -124,6 +124,7 @@ contract NoxFi {
         zArr.push(input[0]);
     }
 
+    // TODO : CHECK
     function withdraw(
         uint256[2] memory a,
         uint256[2][2] memory b,
@@ -153,24 +154,24 @@ contract NoxFi {
         oArr.push(input[1]);
     }
 
-    function matchOrder(uint256 o, bool isMatched) external {
+    function matchOrder(uint oidx, bool isMatched) external {
       require(msg.sender == matcherAddr, "Only Matcher can make a match");
       bool exists = false;
       for (uint i = 0; i < oArr.length; ++i) {
-        if (oArr[i] == o) {
+        if (oArr[i] == oArr[oidx]) {
           exists = true;
           break;
         }
       }
       require(exists, "The O doesn't exist");
-      for (uint i = 0; i < mArr.length; ++i) { require(mArr[i] != o, "The O already matched"); }
+      for (uint i = 0; i < mArr.length; ++i) { require(mArr[i] != oArr[oidx], "The O already matched"); }
       for (uint i = 0; i < cArr.length; ++i) {
-        require(cArr[i] != o, "The O already canceled");
+        require(cArr[i] != oArr[oidx], "The O already canceled");
       }
       if(isMatched) {
-        mArr.push(o);
+        mArr.push(oArr[oidx]);
       } else {
-        cArr.push(o);
+        cArr.push(oArr[oidx]);
       }
     }
 
